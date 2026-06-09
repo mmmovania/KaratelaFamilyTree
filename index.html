@@ -399,7 +399,7 @@ async function boot(){
   const configured = FIREBASE_CONFIG.apiKey && !FIREBASE_CONFIG.apiKey.startsWith('PASTE');
   if(!configured){
     MODE='demo'; ingest(structuredClone(SEED)); render(); renderAuth();
-    bannerMsg('<b>Preview mode.</b> Showing the bundled 1,001 records, read-only. Add your Firebase keys (see the setup guide) to enable live shared editing.');
+    
     return;
   }
   try{
