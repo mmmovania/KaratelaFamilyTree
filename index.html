@@ -434,10 +434,21 @@ $('restoreFile').addEventListener('change', async e=>{
 
 /* ---------- PDF export (vector, via jsPDF + svg2pdf, loaded on demand) ---------- */
 function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=()=>res(); s.onerror=()=>rej(new Error('failed to load '+src)); document.head.appendChild(s); }); }
+async function loadFirst(urls){ let last; for(const u of urls){ try{ await loadScript(u); return; }catch(e){ last=e; } } throw last; }
 let _pdfReady=null;
 function ensurePdfLibs(){ if(_pdfReady) return _pdfReady;
-  _pdfReady=(async()=>{ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
-    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.umd.min.js'); })();
+  _pdfReady=(async()=>{
+    await loadFirst([
+      'https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js',
+      'https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js',
+      'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'
+    ]);
+    if(!window.jspdf || !window.jspdf.jsPDF) throw new Error('jsPDF failed to load');
+    await loadFirst([
+      'https://cdn.jsdelivr.net/npm/svg2pdf.js@2.7.0/dist/svg2pdf.umd.min.js',
+      'https://unpkg.com/svg2pdf.js@2.7.0/dist/svg2pdf.umd.min.js'
+    ]);
+  })().catch(err=>{ _pdfReady=null; throw err; });
   return _pdfReady;
 }
 const FONT_EXP='12px Helvetica, Arial, sans-serif';
@@ -489,6 +500,7 @@ async function exportPDF(rootId){
     const el=holder.querySelector('svg');
     const { jsPDF }=window.jspdf;
     const pdf=new jsPDF({ orientation:(W>=H?'landscape':'portrait'), unit:'pt', format:[W,H], compress:true });
+    if(typeof pdf.svg!=='function') throw new Error('svg2pdf did not attach');
     await pdf.svg(el,{ x:0, y:0, width:W, height:H });
     pdf.save(title+'.pdf');
     holder.remove();
