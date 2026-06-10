@@ -128,6 +128,7 @@
       <button class="btn" id="bCollapse">Collapse</button>
       <button class="btn" id="bFit">Fit</button>
       <div class="zoomgrp"><button id="zOut" title="Zoom out">−</button><div class="div"></div><button id="zIn" title="Zoom in">+</button></div>
+      <button class="btn" id="bPdfAll">Export PDF</button>
       <div class="authbar" id="authbar"></div>
     </div>
   </header>
@@ -144,6 +145,7 @@
     <aside id="panel" class="hidden"><div class="emptystate">Select a person to see their dates, lineage chain, and children.</div></aside>
   </main>
 </div>
+<input type="file" id="restoreFile" accept="application/json,.json" style="display:none">
 <div class="scrim" id="scrim"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
 
@@ -265,11 +267,12 @@ function buildPanel(id){
   const live=(kids.get(id)||[]).length;
   addf('Children', live + (n.recordedChildren!=null && n.recordedChildren!==live ? ' (recorded: '+n.recordedChildren+')' : ''));
   if(n.note) addf('Note', n.note);
-  const editTools = isEditor ? `<div class="editrow">
-      <button class="btn primary" data-act="edit">Edit</button>
+  const editTools = `<div class="editrow">
+      <button class="btn" data-act="pdf">Export branch (PDF)</button>
+      ${isEditor ? `<button class="btn primary" data-act="edit">Edit</button>
       <button class="btn" data-act="addchild">Add child</button>
-      ${live? '' : '<button class="btn danger" data-act="delete">Delete</button>'}
-    </div>` : '';
+      ${live? '' : '<button class="btn danger" data-act="delete">Delete</button>'}` : ''}
+    </div>`;
   panel.innerHTML=`<button class="closep" id="pClose">×</button><div class="pad">
       <div class="ph">${esc(n.name)}</div>
       <div class="pmk"><span class="sx">${esc(n.sex)}</span> · ${GEN[(depth.get(id)||0)+1]||''} generation${yrs(n)?' · '+yrs(n):''}</div>
@@ -279,7 +282,7 @@ function buildPanel(id){
       <div class="sech">Children · ${live}</div><div class="kids">${myKids}</div></div>`;
   $('pClose').onclick=()=>{ panel.classList.add('hidden'); selected=null; render(); };
   panel.querySelectorAll('[data-go]').forEach(el=> el.onclick=()=> select(+el.dataset.go,true));
-  panel.querySelectorAll('[data-act]').forEach(el=> el.onclick=()=>{ const a=el.dataset.act; if(a==='edit')openEdit(id,false); else if(a==='addchild')openEdit(id,true); else if(a==='delete')delNode(id); });
+  panel.querySelectorAll('[data-act]').forEach(el=> el.onclick=()=>{ const a=el.dataset.act; if(a==='edit')openEdit(id,false); else if(a==='addchild')openEdit(id,true); else if(a==='delete')delNode(id); else if(a==='pdf')exportPDF(id); });
 }
 
 /* ---------- search ---------- */
@@ -301,6 +304,7 @@ $('bCollapse').onclick=()=>{ expanded=new Set(); nodes.forEach(n=>{ if((depth.ge
 function setScale(k){ scale=Math.max(.25,Math.min(2.4,k)); svg.setAttribute('width',BBOX.w*scale); svg.setAttribute('height',BBOX.h*scale); }
 $('zIn').onclick=()=>setScale(scale*1.2); $('zOut').onclick=()=>setScale(scale/1.2);
 $('bFit').onclick=()=>{ const k=Math.min(canvas.clientWidth/BBOX.w,canvas.clientHeight/BBOX.h); setScale(k*0.96); canvas.scrollTo({left:0,top:0}); };
+$('bPdfAll').onclick=()=>exportPDF(ROOT);
 canvas.addEventListener('wheel',e=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault(); const r=canvas.getBoundingClientRect(); const cx=canvas.scrollLeft+(e.clientX-r.left),cy=canvas.scrollTop+(e.clientY-r.top); const fx=cx/(BBOX.w*scale),fy=cy/(BBOX.h*scale); setScale(scale*(e.deltaY<0?1.12:1/1.12)); canvas.scrollLeft=fx*BBOX.w*scale-(e.clientX-r.left); canvas.scrollTop=fy*BBOX.h*scale-(e.clientY-r.top);} },{passive:false});
 let drag=null;
 canvas.addEventListener('pointerdown',e=>{ if(e.target.closest('.node'))return; drag={x:e.clientX,y:e.clientY,sl:canvas.scrollLeft,st:canvas.scrollTop}; canvas.classList.add('grabbing'); canvas.setPointerCapture(e.pointerId); });
@@ -382,12 +386,116 @@ function renderAuth(){
   const bar=$('authbar');
   if(MODE!=='live'){ bar.innerHTML='<span>Preview mode · not connected</span>'; return; }
   if(!user){ bar.innerHTML='<button class="btn" id="bSignIn">Sign in to edit</button>'; $('bSignIn').onclick=signIn; return; }
-  if(isEditor){ bar.innerHTML=`<span class="ok">✓ ${esc(user.email)}</span> <button class="btn" id="bOut">Sign out</button>`;
-    $('bOut').onclick=signOutNow; }
+  if(isEditor){ bar.innerHTML=`<span class="ok">✓ ${esc(user.email)}</span> <button class="btn" id="bBackup">Backup</button> <button class="btn" id="bRestore">Restore</button> <button class="btn" id="bOut">Sign out</button>`;
+    $('bOut').onclick=signOutNow; $('bBackup').onclick=backup; $('bRestore').onclick=startRestore; }
   else { bar.innerHTML=`<span class="warn">${esc(user.email)} — view only</span> <button class="btn" id="bOut">Sign out</button>`; $('bOut').onclick=signOutNow; }
 }
 async function signIn(){ try{ await FB.auth.signInWithPopup(auth, new FB.auth.GoogleAuthProvider()); }catch(e){ toast('Sign-in failed: '+e.message); } }
 async function signOutNow(){ await FB.auth.signOut(auth); }
+
+
+/* ---------- backup / restore ---------- */
+function backup(){
+  if(!nodes.length){ toast('Nothing to back up.'); return; }
+  const payload={ app:'karatela-tree', exportedAt:new Date().toISOString(), count:nodes.length,
+    people: nodes.map(n=>({id:n.id,ref:n.ref,name:n.name,birth:n.birth,death:n.death,sex:n.sex,aka:n.aka,note:n.note,parent:n.parent,recordedChildren:n.recordedChildren})) };
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='karatela_backup_'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  toast('Backup downloaded ('+nodes.length+' records).');
+}
+function startRestore(){ if(!isEditor){ toast('Sign in as an editor first.'); return; } const f=$('restoreFile'); f.value=''; f.click(); }
+$('restoreFile').addEventListener('change', async e=>{
+  const file=e.target.files && e.target.files[0]; if(!file) return;
+  let parsed; try{ parsed=JSON.parse(await file.text()); }catch(err){ toast('That file is not valid JSON.'); return; }
+  const people = Array.isArray(parsed) ? parsed : (parsed.people||[]);
+  if(!people.length || !people.some(p=>p.parent==null || p.parent===undefined)){ toast('Backup looks empty or has no root — aborting.'); return; }
+  const recs = people.map(p=>({ id:Number(p.id), ref:p.ref??null, name:p.name||'(unknown)', birth:p.birth??null, death:p.death??null,
+    sex:p.sex||'Unknown', aka:p.aka??null, note:p.note??null, parent:(p.parent==null?null:Number(p.parent)), recordedChildren:p.recordedChildren??null }));
+  const backupIds=new Set(recs.map(r=>r.id));
+  const toDelete=nodes.map(n=>n.id).filter(id=>!backupIds.has(id));
+  if(!confirm('Restore will make the live database match this backup.\n\n• '+recs.length+' record(s) will be written (overwriting current values).\n• '+toDelete.length+' record(s) not in the backup will be DELETED.\n\nThis cannot be undone. Continue?')) return;
+  try{
+    toast('Restoring…');
+    const {doc,collection,writeBatch,serverTimestamp,setDoc}=FB.fs;
+    const ops=[...recs.map(r=>({t:'set',r})), ...toDelete.map(id=>({t:'del',id}))];
+    for(let i=0;i<ops.length;i+=400){ const batch=writeBatch(db);
+      for(const op of ops.slice(i,i+400)){
+        if(op.t==='set') batch.set(doc(db,'people',String(op.r.id)), {...op.r, updatedAt:serverTimestamp(), updatedBy:user.email});
+        else batch.delete(doc(db,'people',String(op.id)));
+      }
+      await batch.commit(); toast('Restoring… '+Math.min(i+400,ops.length)+'/'+ops.length);
+    }
+    try{ await setDoc(doc(collection(db,'edits')), { action:'restore', by:user.email, at:serverTimestamp(), written:recs.length, deleted:toDelete.length }); }catch(_){}
+    toast('Restore complete ('+recs.length+' records).');
+  }catch(err){ toast('Restore failed: '+err.message); }
+});
+
+/* ---------- PDF export (vector, via jsPDF + svg2pdf, loaded on demand) ---------- */
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=()=>res(); s.onerror=()=>rej(new Error('failed to load '+src)); document.head.appendChild(s); }); }
+let _pdfReady=null;
+function ensurePdfLibs(){ if(_pdfReady) return _pdfReady;
+  _pdfReady=(async()=>{ await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    await loadScript('https://cdnjs.cloudflare.com/ajax/libs/svg2pdf.js/2.2.3/svg2pdf.umd.min.js'); })();
+  return _pdfReady;
+}
+const FONT_EXP='12px Helvetica, Arial, sans-serif';
+function buildExportSVG(rootId){
+  const incl=[rootId, ...descendants(rootId)].filter(id=>byId.has(id));
+  const rd=new Map();
+  function rdepth(id){ if(rd.has(id))return rd.get(id); if(id===rootId){ rd.set(id,0); return 0; } const p=byId.get(id).parent; const d=(p!=null&&byId.has(p))?rdepth(p)+1:0; rd.set(id,d); return d; }
+  incl.forEach(rdepth);
+  let maxName=90; incl.forEach(id=>{ const w=tw(byId.get(id).name,FONT_EXP); if(w>maxName)maxName=w; });
+  const C=Math.ceil(maxName+96), R=18, padX=44, padTop=84, padBot=40, mk=3.6, lbldx=11;
+  const pos={}; let leaf=0, maxD=0;
+  function walk(id){ const d=rd.get(id); if(d>maxD)maxD=d;
+    const ch=(kids.get(id)||[]).filter(c=>byId.has(c)).sort((a,b)=>a-b);
+    let y; if(ch.length){ const ys=ch.map(walk); y=(ys[0]+ys[ys.length-1])/2; } else { y=leaf*R; leaf++; }
+    pos[id]={x:padX+d*C, y:padTop+y}; return y; }
+  walk(rootId);
+  const W=padX*2+(maxD+1)*C, H=padTop+padBot+Math.max(1,leaf)*R;
+  const SEX={Male:'#C8402F',Female:'#2F7D4E',Unknown:'#2E5E8C'};
+  const baseGen=(depth.get(rootId)||0);
+  const rootName=byId.get(rootId).name;
+  let s=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  s+=`<rect x="0" y="0" width="${W}" height="${H}" fill="#FDFBF6"/>`;
+  s+=`<text x="${padX}" y="40" font-family="Helvetica" font-size="24" font-weight="bold" fill="#2B2622">Descendants of ${esc(rootName)}</text>`;
+  s+=`<text x="${padX}" y="61" font-family="Helvetica" font-size="12" fill="#6E6353">Karatela family tree  ·  ${incl.length} individuals  ·  generated ${new Date().toISOString().slice(0,10)}</text>`;
+  for(let d=0; d<=maxD; d++){ const x=padX+d*C; const g=GEN[baseGen+d+1]||((baseGen+d+1)+'th');
+    s+=`<line x1="${x}" y1="${padTop-8}" x2="${x}" y2="${H-padBot+6}" stroke="#E7DFCB" stroke-width="1" stroke-dasharray="2 6"/>`;
+    s+=`<text x="${x}" y="${padTop-14}" font-family="Helvetica" font-size="10" fill="#A8762B">${esc(g)}</text>`; }
+  incl.forEach(id=>{ const p=pos[id]; (kids.get(id)||[]).filter(c=>byId.has(c)).forEach(c=>{ const q=pos[c];
+    const x1=p.x+mk,x2=q.x-mk,mx=(x1+x2)/2;
+    s+=`<path d="M${x1},${p.y} C${mx},${p.y} ${mx},${q.y} ${x2},${q.y}" fill="none" stroke="#C0B49A" stroke-width="1"/>`; }); });
+  incl.forEach(id=>{ const n=byId.get(id), p=pos[id], col=SEX[n.sex]||SEX.Unknown;
+    s+=`<circle cx="${p.x}" cy="${p.y}" r="${mk}" fill="${col}" stroke="${col}"/>`;
+    const tx=p.x+lbldx, ty=p.y+4;
+    s+=`<text x="${tx}" y="${ty}" font-family="Helvetica" font-size="12" fill="#2B2622">${esc(n.name)}</text>`;
+    const yr=yrs(n); if(yr){ const nx=tx+tw(n.name,FONT_EXP)+8; s+=`<text x="${nx}" y="${ty}" font-family="Helvetica" font-size="10" fill="#6E6353">${esc(yr)}</text>`; } });
+  s+=`</svg>`;
+  return { svg:s, W, H, title:'Karatela_'+rootName.replace(/[^A-Za-z0-9]+/g,'_') };
+}
+async function exportPDF(rootId){
+  if(rootId==null || !byId.has(rootId)){ toast('Nothing to export.'); return; }
+  const count=1+descendants(rootId).size;
+  if(count>1200 && !confirm('This will export '+count+' people as one large PDF and may take a little while. Continue?')) return;
+  try{
+    toast('Preparing PDF…');
+    await ensurePdfLibs();
+    const {svg,W,H,title}=buildExportSVG(rootId);
+    const holder=document.createElement('div'); holder.style.cssText='position:fixed;left:-99999px;top:0';
+    holder.innerHTML=svg; document.body.appendChild(holder);
+    const el=holder.querySelector('svg');
+    const { jsPDF }=window.jspdf;
+    const pdf=new jsPDF({ orientation:(W>=H?'landscape':'portrait'), unit:'pt', format:[W,H], compress:true });
+    await pdf.svg(el,{ x:0, y:0, width:W, height:H });
+    pdf.save(title+'.pdf');
+    holder.remove();
+    toast('PDF saved.');
+  }catch(e){ toast('PDF failed: '+((e&&e.message)||e)); }
+}
+
 
 /* ---------- boot ---------- */
 function bannerMsg(html){ const b=$('banner'); b.style.display='block'; b.innerHTML=html; }
