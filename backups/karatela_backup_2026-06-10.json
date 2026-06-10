@@ -1,6 +1,7 @@
 {
   "app": "karatela-tree",
-  "exportedAt": "2026-06-10T02:15:02.421Z",
+  "version": "1.0.2",
+  "exportedAt": "2026-06-10T02:50:36.012Z",
   "count": 1036,
   "people": [
     {
@@ -223,11 +224,11 @@
       "id": 1013,
       "ref": null,
       "name": "Saad Muhammad Asif Muhammad Hussain Noor Muhammad Abdul Karim Movania",
-      "birth": null,
+      "birth": 2001,
       "death": null,
       "sex": "Male",
       "aka": "Saad Movania",
-      "note": null,
+      "note": "https://www.linkedin.com/in/smovania/",
       "parent": 223,
       "recordedChildren": 0
     },
@@ -235,11 +236,11 @@
       "id": 1014,
       "ref": null,
       "name": "Raiyaan Muhammad Asif Muhammad Hussain Noor Muhammad Abdul Karim Movania",
-      "birth": null,
+      "birth": 2003,
       "death": null,
       "sex": "Male",
       "aka": "Raiyaan Movania",
-      "note": null,
+      "note": "https://www.linkedin.com/in/raiyaanmovania/",
       "parent": 223,
       "recordedChildren": 0
     },
@@ -390,11 +391,11 @@
     {
       "id": 1026,
       "ref": null,
-      "name": "Hiba Muhammad Asif Muhammad Hussain Noor Muhammad Abdul Karim Movania",
-      "birth": null,
+      "name": "Hibba Muhammad Asif Muhammad Hussain Noor Muhammad Abdul Karim Movania",
+      "birth": 2009,
       "death": null,
       "sex": "Female",
-      "aka": "Hiba Movania",
+      "aka": "Hibba Movania",
       "note": null,
       "parent": 223,
       "recordedChildren": 0
