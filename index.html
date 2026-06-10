@@ -23,6 +23,7 @@
   h1{font-family:var(--serif);font-weight:600;font-size:25px;letter-spacing:.02em;margin:0}
   h1 .k{color:var(--brass)}
   .sub{font-size:12.5px;color:var(--ink-soft);letter-spacing:.04em;text-transform:uppercase}
+  .ver{font-size:11px;color:var(--ink-soft);border:1px solid var(--hair);border-radius:999px;padding:2px 9px;letter-spacing:.04em;font-variant-numeric:tabular-nums}
   .meta{margin-left:auto;font-size:12px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
   .meta b{color:var(--ink);font-weight:600}
   .controls{display:flex;gap:10px;align-items:center;margin-top:11px;flex-wrap:wrap}
@@ -116,6 +117,7 @@
     <div class="titrow">
       <h1><span class="k">Karatela</span> &nbsp;·&nbsp; Descendants of Didher Khatri</h1>
       <span class="sub">A patrilineal register</span>
+      <span class="ver" id="appVer"></span>
       <span class="meta"><b id="cTot">0</b> individuals &nbsp;·&nbsp; <b id="cGen">19</b> generations &nbsp;·&nbsp; 1678 → present</span>
     </div>
     <div class="controls">
@@ -169,6 +171,8 @@ const SEXLET={Male:'M',Female:'F',Unknown:'U'};
 const GEN=['','Founder','2nd','3rd','4th','5th','6th','7th','8th','9th','10th','11th','12th','13th','14th','15th','16th','17th','18th','19th','20th','21st'];
 const $=id=>document.getElementById(id);
 const svg=$('svg'), canvas=$('canvas'), panel=$('panel');
+const APP_VERSION='1.0.0';
+{ const e=$('appVer'); if(e) e.textContent='v'+APP_VERSION; }
 
 /* ---------- helpers ---------- */
 function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -397,7 +401,7 @@ async function signOutNow(){ await FB.auth.signOut(auth); }
 /* ---------- backup / restore ---------- */
 function backup(){
   if(!nodes.length){ toast('Nothing to back up.'); return; }
-  const payload={ app:'karatela-tree', exportedAt:new Date().toISOString(), count:nodes.length,
+  const payload={ app:'karatela-tree', version:APP_VERSION, exportedAt:new Date().toISOString(), count:nodes.length,
     people: nodes.map(n=>({id:n.id,ref:n.ref,name:n.name,birth:n.birth,death:n.death,sex:n.sex,aka:n.aka,note:n.note,parent:n.parent,recordedChildren:n.recordedChildren})) };
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);

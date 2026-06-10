@@ -1,0 +1,82 @@
+KARATELA FAMILY TREE — VERSION HISTORY
+======================================
+
+The current version is shown as a badge in the app header (top-left, next to
+"A patrilineal register") and is stamped into every backup file you download
+(the "version" field). Keep this file alongside index.html and bump the
+APP_VERSION constant in index.html whenever you make a change.
+
+
+v1.0.0  —  2026-06-10  (current)
+--------------------------------
+First formally versioned release. Adds an in-app version badge in the header,
+and records the version inside backup JSON files.
+
+Everything below describes how the app reached this point. The milestones prior
+to v1.0.0 were development builds and were not individually version-numbered at
+the time; they are listed here for reference.
+
+
+DEVELOPMENT HISTORY (pre-1.0.0)
+===============================
+
+Milestone 6 — PDF export reliability fix
+- Fixed "PDF failed: failed to load svg2pdf" error. The previous CDN link
+  pointed at svg2pdf.js 2.2.3, a version that was never published.
+- Switched the PDF libraries to known-good versions served from npm:
+  jsPDF 2.5.2 and svg2pdf.js 2.7.0.
+- Each library now tries multiple CDNs in order (jsDelivr -> unpkg -> cdnjs),
+  so a single CDN outage no longer breaks export. Failed loads are no longer
+  cached, so retrying actually retries.
+- Added a clear error if the SVG-to-PDF method fails to attach.
+
+Milestone 5 — Backup/Restore and PDF export
+- Backup (editor only): downloads the entire live database as a dated JSON
+  file (karatela_backup_YYYY-MM-DD.json), usable as a restore point or for
+  migrating hosts.
+- Restore (editor only): loads a backup JSON and makes the live database match
+  it (writes/overwrites records in the file, deletes records not in the file).
+  Shows both counts and requires confirmation; refuses a file with no root
+  person so a bad file cannot wipe the tree; records the event in the change log.
+- Export PDF (everyone): renders the entire tree, fully expanded, as one
+  vector PDF (crisp, selectable text).
+- Export branch (PDF) (everyone): from a selected person's panel, exports just
+  that person and all of their descendants.
+
+Milestone 4 — Removed the one-time importer and bundled data
+- Removed the "Import data" button (it could overwrite live edits / resurrect
+  deleted people if pressed again).
+- Removed the bundled copy of the 1,001 records that shipped inside the page;
+  Firestore is now the single source of truth. File size dropped ~150 KB.
+- Cleaned up offline/empty-database messages so they no longer reference the
+  removed bundled data.
+
+Milestone 3 — Readability: names no longer cluttered
+- Long patronymic names that ran into the next generation are now shortened
+  with an ellipsis; the trimmed part is the redundant lineage, so the given
+  name stays visible. Full name appears on hover and in the detail panel.
+- Birth/death years are now positioned using true measured text width, fixing
+  the "Movania1980" jammed-text problem.
+- Wider columns and taller rows for clearer spacing.
+
+Milestone 2 — Marker colours and label placement
+- Marker colours changed to: male = red, female = green, unknown = blue.
+- Person names now sit above their connecting lines instead of centred on them.
+
+Milestone 1 — Live shared editing on Firebase
+- Connected the tree to Firebase Firestore for a live, shared, multi-editor site.
+- Google sign-in with an editor allowlist: invited family members (emails in the
+  "editors" collection) can edit; everyone else views read-only.
+- Edit, add child, and delete (leaf only) from a person's detail panel.
+- Real-time updates: changes appear for everyone without a refresh.
+- Change log: every edit records who/when/before/after in an "edits" collection.
+- Shipped firestore.rules (public read, editor-only writes) and a step-by-step
+  setup guide for Firebase + GitHub Pages hosting.
+
+Milestone 0 — Initial interactive tree
+- Parsed the original Karatela genealogy PDF (1,001 individuals) and
+  reconstructed the full family structure (19 generations, single root:
+  Didher Khatri Karatela, b. 1678).
+- Built a single self-contained HTML tree: collapsible nodes, search by name or
+  reference number, click-to-pan/zoom, and a detail panel showing dates, sex,
+  lineage chain, and children. Worked fully offline.
