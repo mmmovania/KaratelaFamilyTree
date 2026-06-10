@@ -7,8 +7,15 @@ The current version is shown as a badge in the app header (top-left, next to
 APP_VERSION constant in index.html whenever you make a change.
 
 
-v1.0.1  —  2026-06-10  (current)
+v1.0.2  —  2026-06-10  (current)
 --------------------------------
+- PDF export now prints the app version in the subtitle line (next to the
+  individual count and generation date), so any exported PDF is traceable to
+  the build that produced it.
+
+
+v1.0.1  —  2026-06-10
+---------------------
 - PDF export: connecting lines no longer run through the names. Each name now
   has a background "halo" that masks the lines beneath the text, so names sit
   cleanly on top and the lines re-emerge after each name.
